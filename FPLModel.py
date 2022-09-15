@@ -28,6 +28,30 @@ gameweekData = pd.read_csv('C:/Users/bradl/OneDrive/Desktop/Professional/FPL/Par
 elementTypes = pd.read_csv("C:/Users/bradl/OneDrive/Desktop/Professional/FPL/ParsedFiles/elementTypes.csv") #DROP INDEX FROM THIS, could probably just make this a lookup/map
 
 
+
+#Current team by ID: (Jose Sa, trent AA, Coufal, Cancelo, Bowen, James Ward-Prowse, Gabriel Martinelli, Mo Salah, James Maddison, Gabriel Jesus, Ollie Watkins, Matty Cash, Tanganga, Edouard)
+currTeam = [478, 285, 463, 306, 465, 407, 19, 283, 261, 28, 40, 43, 439, 166]
+
+
+
+def displayNullStats(display, dataframe):
+    if display == 0:
+        pass
+    else:
+
+    	#length of dataframe columns
+        columnLength = dataframe.shape[0]
+
+        #loop through columns
+        for col in dataframe.columns:
+
+            countNulls = dataframe[col].isnull().sum()
+
+            percentNulls = round((countNulls / columnLength) * 100, 1)
+
+            print("{} has {} nulls and {}% of nulls.".format(str(col), countNulls, percentNulls))
+            
+
 #This is solely used for the final predicted gameweek. will aggregate these, and then use the distinct value for that week on the rest
 def aggregatePrevGameweeks(startweek: int, endweek: int, dataframe, features):
 
@@ -154,6 +178,7 @@ def makePredictions(xTrainList, yTrainList, xTestList, yTestList, playerIDLists,
 		dataToExport['PlayerID'] = xTestList[i]['playerID']
 		dataToExport['TrueY'] = yTestList[i]
 		dataToExport['pointsToCost'] = dataToExport['predPoints'] / dataToExport['now_cost']
+		dataToExport['InTeam'] = np.where(np.isin(dataToExport['PlayerID'], currTeam), 1, 0)
 		dataToExport = dataToExport.sort_values('predPoints', ascending = False)
 		filePath = 'C:/Users/bradl/OneDrive/Desktop/Professional/FPL/Final/test' + fNameList[i] + '.csv'
 		dataToExport.to_csv(filePath,index=False)
@@ -226,6 +251,7 @@ playerData['teamName'] = playerData['team'].map(teamMap)
 
 
 #GAMEWEEK PREPROCESSING##############################################################################################################
+
 
 
 
@@ -305,6 +331,20 @@ testData = pd.merge(testData, teamData[['id', 'strength_overall_away']], left_on
 #get differential. positive means home is favored, negative means away is
 trainData['strDiff'] = trainData['strength_overall_home'] - trainData['strength_overall_away']
 testData['strDiff'] = testData['strength_overall_home'] - testData['strength_overall_away']
+
+
+
+
+
+#Check nulls in both dataframes
+displayNullStats(0, trainData)
+displayNullStats(0, testData)
+
+
+
+
+
+
 
 #Split into ATK, MID, DEF, GK groups
 trainDataGK = trainData[trainData['element_type'] == 1]
@@ -388,6 +428,13 @@ testDataDEF = testDataDEF.drop('playerID',axis=1)
 
 trainDataGK = trainDataGK.drop('playerID',axis=1)
 testDataGK = testDataGK.drop('playerID',axis=1)
+
+
+
+
+
+
+
 
 #target variable
 yTrainATK = trainDataATK['total_points']
