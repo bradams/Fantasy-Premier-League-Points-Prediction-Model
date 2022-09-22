@@ -1,6 +1,11 @@
 import requests
 import json
+import numpy as np
 import pandas as pd
+import datetime
+import time
+
+#NOTES
 
 
 
@@ -8,73 +13,85 @@ import pandas as pd
 
 
 #grab all gameweek json files between startWeek and endWeek. First gameweek starts at 1. 
-def createGameweekFiles(startWeek: int, endWeek: int):
+def scrapeGameweekFiles(startWeek: int, endWeek: int, toRun: int):
 
-	#file path
-	filePath = "C:/Users/bradl/OneDrive/Desktop/Professional/FPL/IntFiles/GameWeekFiles/"
+	if toRun == 0:
+		pass
 
-	#loop trhough designated gameweeks
-	for i in range(startWeek, endWeek+1):
+	else:
+		#file path
+		filePath = "C:/Users/bradl/OneDrive/Desktop/Professional/FPL/IntFiles/GameWeekFiles/"
 
-		#variable for file name, set full path
-		fileName = "gameWeek" + str(i) + "Data.json"
-		fullPath = filePath + fileName
+		#loop through designated gameweeks
+		for i in range(startWeek, endWeek+1):
 
-		#URL to be passed in requests.get
-		gameWeekURL = "https://fantasy.premierleague.com/api/event/" + str(i) + "/live/"
+			#variable for file name, set full path
+			fileName = "gameWeek" + str(i) + "Data.json"
+			fullPath = filePath + fileName
 
-		#send response, store json data
-		response = requests.get(gameWeekURL)
-		data = response.json()
-		with open(fullPath, "w", encoding="utf-8") as f:
-		    json.dump(data, f, ensure_ascii = False, indent = 4)
+			#URL to be passed in requests.get
+			gameWeekURL = "https://fantasy.premierleague.com/api/event/" + str(i) + "/live/"
 
-		print("Gameweek ", i , " data has been stored.")
+			#send response, store json data
+			response = requests.get(gameWeekURL)
+			data = response.json()
+			with open(fullPath, "w", encoding="utf-8") as f:
+			    json.dump(data, f, ensure_ascii = False, indent = 4)
+			f.close()
 
-		#wait until next request is sent to be mindful of amount of requests at once
-		time.sleep(10)
+			print("Gameweek ", i , " data has been stored.")
 
-
-def parseGameweekFiles(startWeek: int, endWeek: int):
-
-	#will hold final dataframe to be sent into parsedFiles
-	parsedData = pd.DataFrame()
-	
-	intFilePath = "C:/Users/bradl/OneDrive/Desktop/Professional/FPL/IntFiles/GameWeekFiles/"
-
-	#loop through gameweeks
-	for i in range(startWeek, endWeek+1):
+			#wait until next request is sent to be mindful of amount of requests at once
+			time.sleep(10)
 
 
-		#Name for json file in intFile directory, set path to that directory as well
-		fullIntPath = intFilePath + "gameWeek" + str(i) + "Data.json"
+def parseGameweekFiles(startWeek: int, endWeek: int, toRun: int):
 
+	if toRun == 0:
+		pass
 
-		f = open(fullIntPath, encoding="utf-8")
-		data = json.load(f)
+	else:
 
-		#get throgh 1st main element of json file (elements)
-		for block in data['elements']:
-			
-			#dict to hold all data per gamewekk for a player
-			playerData = {}
-
-			#set gameweek column
-			playerData['gameweek'] = i
-
-			#set player ID
-			playerData['playerID'] = block['id']
-
-			#loop through stats
-			for statName,statVal in block['stats'].items():
-				
-				#Store data in dict as statistic : value (ex. minutes:90)
-				playerData[statName] = statVal
+		#will hold final dataframe to be sent into parsedFiles
+		parsedData = pd.DataFrame()
 		
-			parsedData = parsedData.append(playerData, ignore_index=True)
+		intFilePath = "C:/Users/bradl/OneDrive/Desktop/Professional/FPL/IntFiles/GameWeekFiles/"
+
+		#loop through gameweeks
+		for i in range(startWeek, endWeek+1):
+
+
+			#Name for json file in intFile directory, set path to that directory as well
+			fullIntPath = intFilePath + "gameWeek" + str(i) + "Data.json"
+
+
+			f = open(fullIntPath, encoding="utf-8")
+			data = json.load(f)
+
+			#get throgh 1st main element of json file (elements)
+			for block in data['elements']:
 				
-	#send parsed data to folder as CSV
-	parsedData.to_csv('C:/Users/bradl/OneDrive/Desktop/Professional/FPL/ParsedFiles/gameWeekData.csv',index=False)
+				#dict to hold all data per gamewekk for a player
+				playerData = {}
+
+				#set gameweek column
+				playerData['gameweek'] = i
+
+				#set player ID
+				playerData['playerID'] = block['id']
+
+				#loop through stats
+				for statName,statVal in block['stats'].items():
+					
+					#Store data in dict as statistic : value (ex. minutes:90)
+					playerData[statName] = statVal
+			
+				parsedData = parsedData.append(playerData, ignore_index=True)
+					
+			f.close()
+
+		#send parsed data to folder as CSV
+		parsedData.to_csv('C:/Users/bradl/OneDrive/Desktop/Professional/FPL/ParsedFiles/gameWeekData.csv',index=False)
 
 
 
@@ -85,7 +102,8 @@ def parseGameweekFiles(startWeek: int, endWeek: int):
 
 #DRIVER############################
 
+#scrape needed weeks, only ones that have not already been done before
+scrapeGameweekFiles(6,8,0)
 
-#createGameweekFiles(1,5)
-
-parseGameweekFiles(1,5)
+#parse all weeks 
+parseGameweekFiles(1,8,1)

@@ -13,17 +13,20 @@ def scrapeBootStrapStatic(toRun):
 		link = "https://fantasy.premierleague.com/api/bootstrap-static/"
 		response = requests.get(link)
 		data = response.json()
-		with open("response.json", "w", encoding="utf-8") as f:
+		with open("C:/Users/bradl/OneDrive/Desktop/Professional/FPL/IntFiles/response.json", "w", encoding="utf-8") as f:
 		    json.dump(data, f, ensure_ascii = False, indent = 4)
+		f.close()    
+
 
 
 
 #EVENTS DATA################################
 
-def scrapeEventData(toRun):
+def parseEventData(toRun):
 	if toRun == 0:
 		pass
 	else:
+		print("Parsing event data.")
 		eventDataDF = pd.DataFrame()
 
 		#loop through each gameweek
@@ -42,16 +45,12 @@ def scrapeEventData(toRun):
 				#want this data - loop through its elements
 				elif eventItem == 'top_element_info' and eventData['id'] <= 4:
 
-					#print(eventVal)
-
-
 					#loop through next level of top_element_info
 					for topElemInfo, topElemVal in eventVal.items():
 
 							#dict key name
 							keyName = "top_element_info_" + topElemInfo
 
-							print("TEST: ", keyName, topElemVal)
 							#store
 							eventData[keyName] = topElemVal
 
@@ -69,11 +68,11 @@ def scrapeEventData(toRun):
 
 
 #TEAM DATA
-def storeTeamData(toRun):
+def parseTeamData(toRun):
 	if toRun == 0:
 		pass
 	else:
-		print("SCraping Team Data")
+		print("Parsing team data")
 		teamDataDF = pd.DataFrame()
 
 		for team in data['teams']:
@@ -91,7 +90,7 @@ def storeTeamData(toRun):
 			teamDataDF = teamDataDF.append(teamData, ignore_index=True)
 
 
-			teamDataDF.to_csv('C:/Users/bradl/OneDrive/Desktop/Professional/FPL/ParsedFiles/teamData.csv',index=False)
+		teamDataDF.to_csv('C:/Users/bradl/OneDrive/Desktop/Professional/FPL/ParsedFiles/teamData.csv',index=False)
 
 
 
@@ -99,33 +98,39 @@ def storeTeamData(toRun):
 #ELEMENTS DATA#####################
 #player data
 
-def scrapeElementsData(toRun):
+def parseElementsData(toRun):
 	if toRun == 0:
 		pass
 	else:
+		print("Parsing elements data")
 		dfElements = pd.json_normalize(data['elements'])
 		dfElements.to_csv('C:/Users/bradl/OneDrive/Desktop/Professional/FPL/ParsedFiles/elements.csv',encoding='utf-8-sig',index=False)
 
 
 
-#ELEMENTS TYPE#############
-def scrapeElementTypes(toRun):
-	if toRun == 0:
-		pass
-	else:
-		dfElementType = pd.json_normalize(data['element_types'])
-		dfElementType.to_csv('elementTypes.csv',index=False)
 
 
 
 
 #DRIVER CODE###########
 
-#Reading and parsing JSON, read into global data variable
-f = open('C:/Users/bradl/OneDrive/Desktop/Professional/FPL/INTFiles/response.json', encoding="utf-8")
+#scapes entire page, stores as JSON. 
+scrapeBootStrapStatic(1)
+
+
+#Reading and parsing JSON from scrapeBootStrapStatic(), read into data variable
+f = open('C:/Users/bradl/OneDrive/Desktop/Professional/FPL/IntFiles/response.json', encoding="utf-8")
 data = json.load(f)
 
-scrapeEventData(0)
-storeTeamData(0)
-scrapeElementsData(0)
-scrapeElementTypes(0)
+
+#parses out event data from data 
+parseEventData(1)
+
+#parses out team data from data 
+parseTeamData(1)
+
+#parses out player data
+parseElementsData(1)
+
+#close file
+f.close()

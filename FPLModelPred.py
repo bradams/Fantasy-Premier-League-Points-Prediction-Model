@@ -97,6 +97,7 @@ def testRegressor(xTrain, yTrain, xTest, yTest, playerIDList, modelList, fName):
 			print(coefs)
 
 
+
 #Function to tune hyperparameters for chosen model        
 def tuneHyperparameters(xTrainList, yTrainList, nameList, mdl):
 
@@ -146,7 +147,6 @@ def makePredictions(xTrainList, yTrainList, xTestList, yTestList, playerIDLists,
 		#time and train model
 		startTime = time.time()
 		model.fit(xTrainList[i], yTrainList[i])
-		print(model.score(xTestList[i], yTestList[i]))
 
 		#create predictions
 		yPred = np.around(model.predict(xTestList[i]),2)
@@ -178,7 +178,7 @@ def makePredictions(xTrainList, yTrainList, xTestList, yTestList, playerIDLists,
 		dataToExport['pointsToCost'] = dataToExport['predPoints'] / dataToExport['now_cost']
 		dataToExport['InTeam'] = np.where(np.isin(dataToExport['PlayerID'], currTeam), 1, 0)
 		dataToExport = dataToExport.sort_values('predPoints', ascending = False)
-		filePath = 'C:/Users/bradl/OneDrive/Desktop/Professional/FPL/Final/test' + fNameList[i] + '.csv'
+		filePath = 'C:/Users/bradl/OneDrive/Desktop/Professional/FPL/Final/pred' + fNameList[i] + '.csv'
 		dataToExport.to_csv(filePath,index=False)
 		yield dataToExport
 
@@ -191,9 +191,6 @@ def suggestTransfer(transferDF, currTeam):
 	transferListDF = pd.DataFrame(transferDF[~transferDF['PlayerID'].isin(currTeam)], columns = transferDF.columns)
 
 	currTeamDF = pd.DataFrame(transferDF[transferDF['PlayerID'].isin(currTeam)], columns = transferDF.columns)
-
-	print(currTeamDF.dtypes)
-	print(transferListDF.dtypes)
 
 	suggestedTransfer = pd.DataFrame(columns = ['currPlayer','suggPlayer','currPoints','suggPoints','currCost','suggCost'])
 
@@ -281,11 +278,19 @@ playerData['teamName'] = playerData['team'].map(teamMap)
 
 #split trainig and testing sets
 trainData = gameweekData[gameweekData['gameweek'] != currGameweek]
-testData = gameweekData[gameweekData['gameweek'] == currGameweek]
+testData = gameweekData[gameweekData == (currGameweek-1)]
 
-#join in player data
+
+#Add chance_of_playing_next_round?? form instead of average it??
+testData = playerData[['id','team','status','element_type']]
+
+#needed to merge fixture data
+testData['event'] = currGameweek
+
+
+#join in player data for train data
 trainData = pd.merge(trainData, playerData[['id','element_type','form','team','status']], left_on = 'playerID', right_on = 'id', how ='left').drop('id',axis=1)
-testData = pd.merge(testData, playerData[['id','element_type','form','team','status']], left_on = 'playerID', right_on = 'id', how='left').drop('id', axis=1)
+
 
 #Filter for active players (not injured, suspended, on loan, etc.)
 trainData = trainData[trainData['status'] == 'a']
@@ -295,14 +300,16 @@ testData = testData[testData['status'] == 'a']
 trainData = trainData.drop('status',axis=1)
 testData = testData.drop('status',axis=1)
 
+
 #join for home team...check if team matches with team_h otherwise we know they'rw away
 #1st step - join for the home team in a gameweek
 trainData = pd.merge(trainData, fixtureData[['event','team_h']], left_on = ['gameweek','team'], right_on = ['event','team_h'], how='left').drop('event',axis=1)
-testData = pd.merge(testData, fixtureData[['event','team_h']], left_on = ['gameweek','team'], right_on = ['event','team_h'], how='left').drop('event',axis=1)
+testData = pd.merge(testData, fixtureData[['event','team_h']], left_on = ['event','team'], right_on = ['event','team_h'], how='left')
 
 #Then join back to get away team
 trainData = pd.merge(trainData, fixtureData[['event','team_a']], left_on = ['gameweek','team'], right_on = ['event','team_a'], how='left').drop('event',axis=1)
-testData = pd.merge(testData, fixtureData[['event','team_a']], left_on = ['gameweek','team'], right_on = ['event','team_a'], how='left').drop('event',axis=1)
+testData = pd.merge(testData, fixtureData[['event','team_a']], left_on = ['event','team'], right_on = ['event','team_a'], how='left')
+
 
 
 #JOIN FOR OPPONENT TEAM
@@ -314,14 +321,13 @@ trainData['team_h'] = trainData['team_h'].fillna(trainData['team_h_y'])
 trainData = trainData.drop(['event', 'team_h_y', 'team_a_y'],axis=1)
 
 
+
 #same process for testing data
-testData = pd.merge(testData, fixtureData[['event','team_h','team_a']], left_on = ['gameweek','team'], right_on = ['event','team_a'], how='left', suffixes = ("","_y"))
+testData = pd.merge(testData, fixtureData[['event','team_h','team_a']], left_on = ['event','team'], right_on = ['event','team_a'], how='left', suffixes = ("","_y"))
 
 #fill null home team values with merged home team, drop columns
 testData['team_h'] = testData['team_h'].fillna(testData['team_h_y'])
-testData = testData.drop(['event', 'team_h_y', 'team_a_y'],axis=1)
-
-
+testData = testData.drop(['team_h_y', 'team_a_y'],axis=1)
 
 
 #opponent is away team, drop the away column as it is just the joining column. merge the team_h_x or whatever
@@ -330,7 +336,7 @@ trainData['team_a'] = trainData['team_a'].fillna(trainData['team_a_y'])
 trainData = trainData.drop(['event', 'team_h_y', 'team_a_y'],axis=1)
 
 #same process for test data
-testData = pd.merge(testData, fixtureData[['event','team_h','team_a']], left_on = ['gameweek','team'], right_on = ['event','team_h'], how='left', suffixes = ("","_y"))
+testData = pd.merge(testData, fixtureData[['event','team_h','team_a']], left_on = ['event','team'], right_on = ['event','team_h'], how='left', suffixes = ("","_y"))
 testData['team_a'] = testData['team_a'].fillna(testData['team_a_y'])
 testData = testData.drop(['event', 'team_h_y', 'team_a_y'],axis=1)
 
@@ -342,13 +348,14 @@ testData['isHome'] = np.where(testData['team'] == testData['team_h'], 1, 0)
 trainData.drop('team',axis=1,inplace=True)
 testData.drop('team',axis=1,inplace=True)
 
+
 #Bring in home strength 
 trainData = pd.merge(trainData, teamData[['id', 'strength_overall_home']], left_on = 'team_h', right_on='id', how='left').drop('id',axis=1)
-testData = pd.merge(testData, teamData[['id', 'strength_overall_home']], left_on = 'team_h', right_on='id', how='left').drop('id',axis=1)
+testData = pd.merge(testData, teamData[['id', 'strength_overall_home']], left_on = 'team_h', right_on='id', how='left', suffixes = ['','_x']).drop('id_x',axis=1)
 
 #bring in away strength
 trainData = pd.merge(trainData, teamData[['id', 'strength_overall_away']], left_on = 'team_a', right_on='id', how='left').drop('id',axis=1)
-testData = pd.merge(testData, teamData[['id', 'strength_overall_away']], left_on = 'team_a', right_on='id', how='left').drop('id',axis=1)
+testData = pd.merge(testData, teamData[['id', 'strength_overall_away']], left_on = 'team_a', right_on='id', how='left', suffixes = ['','_x']).drop('id_x',axis=1)
 
 #get differential. positive means home is favored, negative means away is
 trainData['strDiff'] = trainData['strength_overall_home'] - trainData['strength_overall_away']
@@ -357,13 +364,12 @@ testData['strDiff'] = testData['strength_overall_home'] - testData['strength_ove
 
 #drop gameweek 8 as most games havent been played
 trainData = trainData[trainData['gameweek'] != 8]
-testData = testData[testData['gameweek'] != 8]
+
 
 
 #Check nulls in both dataframes
 displayNullStats(0, trainData)
 displayNullStats(0, testData)
-
 
 
 #Split into ATK, MID, DEF, GK groups
@@ -384,75 +390,75 @@ statsToAvgATK = ['minutes','goals_scored','assists','own_goals','penalties_saved
 				'ict_index','form','total_points']
 
 statsToAvgDEF = ['minutes','goals_scored','assists','clean_sheets','goals_conceded','own_goals','penalties_saved','penalties_missed','yellow_cards','red_cards','bonus','influence',
-				'creativity','threat','ict_index','in_dreamteam','form','isHome','strength_overall_home','strength_overall_away', 'strDiff','total_points']
+				'creativity','threat','ict_index','form','total_points']
 
 statsToAvgGK = ['minutes','goals_scored','assists','clean_sheets','goals_conceded','own_goals','penalties_saved','penalties_missed','yellow_cards','red_cards','saves','bonus',
-				'influence','creativity','threat','ict_index','in_dreamteam','form','isHome','strength_overall_home','strength_overall_away', 'strDiff','total_points']
+				'influence','creativity','threat','ict_index','form','total_points']
 
 #columns that we'll use upcoming game's data for
 nonAggregatedValues = ['strDiff','strength_overall_home','strength_overall_away','isHome']
 
 #aggregate previous weeks between parameter 1 and 2
-prevWeeksAvgATK = aggregatePrevGameweeks(5,7, trainDataATK, statsToAvgATK)
-prevWeeksAvgMID = aggregatePrevGameweeks(5,7, trainDataMID, statsToAvgATK)
-prevWeeksAvgDEF = aggregatePrevGameweeks(5,7, trainDataDEF, statsToAvgDEF)
-prevWeeksAvgGK = aggregatePrevGameweeks(5,7, trainDataGK, statsToAvgGK)
+prevWeeksAvgATK = aggregatePrevGameweeks(4,7, trainDataATK, statsToAvgATK)
+prevWeeksAvgMID = aggregatePrevGameweeks(4,7, trainDataMID, statsToAvgATK)
+prevWeeksAvgDEF = aggregatePrevGameweeks(4,7, trainDataDEF, statsToAvgDEF)
+prevWeeksAvgGK = aggregatePrevGameweeks(4,7, trainDataGK, statsToAvgGK)
 
 #train model on x weeks of data
-trainDataATK = trainDataATK[trainDataATK['gameweek'].isin([1,2,3,4])]
-trainDataMID = trainDataMID[trainDataMID['gameweek'].isin([1,2,3,4])]
-trainDataDEF = trainDataDEF[trainDataDEF['gameweek'].isin([1,2,3,4])]
-trainDataGK = trainDataGK[trainDataGK['gameweek'].isin([1,2,3,4])]
+trainDataATK = trainDataATK[trainDataATK['gameweek'].isin([1,2,3])]
+trainDataMID = trainDataMID[trainDataMID['gameweek'].isin([1,2,3])]
+trainDataDEF = trainDataDEF[trainDataDEF['gameweek'].isin([1,2,3])]
+trainDataGK = trainDataGK[trainDataGK['gameweek'].isin([1,2,3])]
 
 
 #Clean up columns for ATK
-testDataATK = testDataATK.drop(statsToAvgATK, axis=1)
-testDataATK = testDataATK.drop(['gameweek','clean_sheets', 'goals_conceded', 'saves','bps', 'element_type', 'team_h', 'team_a'],axis=1)
+testDataATK = testDataATK.drop(['element_type', 'team_h', 'team_a'],axis=1)
 trainDataATK = trainDataATK.drop(['gameweek','clean_sheets', 'goals_conceded', 'saves','bps', 'element_type', 'team_h', 'team_a'],axis=1)
 
 #Clean up columns for MID
-testDataMID = testDataMID.drop(statsToAvgATK, axis=1)
-testDataMID = testDataMID.drop(['gameweek','clean_sheets', 'goals_conceded', 'saves','bps', 'element_type', 'team_h', 'team_a'],axis=1)
+testDataMID = testDataMID.drop(['element_type', 'team_h', 'team_a'],axis=1)
 trainDataMID = trainDataMID.drop(['gameweek','clean_sheets', 'goals_conceded', 'saves','bps', 'element_type', 'team_h', 'team_a'],axis=1)
 
 #Clean up columns for DEF
-testDataDEF = testDataDEF.drop(statsToAvgDEF, axis=1)
-testDataDEF = testDataDEF.drop(['gameweek', 'saves','bps', 'element_type', 'team_h', 'team_a'],axis=1)
+testDataDEF = testDataDEF.drop(['element_type', 'team_h', 'team_a'],axis=1)
 trainDataDEF = trainDataDEF.drop(['gameweek', 'saves','bps', 'element_type', 'team_h', 'team_a'],axis=1)
 
 #Clean up columns for GK
-testDataGK = testDataGK.drop(statsToAvgGK, axis=1)
-testDataGK = testDataGK.drop(['gameweek','bps', 'element_type', 'team_h', 'team_a'],axis=1)
+testDataGK = testDataGK.drop(['element_type', 'team_h', 'team_a'],axis=1)
 trainDataGK = trainDataGK.drop(['gameweek','bps', 'element_type', 'team_h', 'team_a'],axis=1)
 
+
+
 #Merge testing data to aggregated columns
-testDataATK = pd.merge(testDataATK, prevWeeksAvgATK, on = 'playerID', how='left')
-testDataMID = pd.merge(testDataMID, prevWeeksAvgMID, on = 'playerID', how='left')
-testDataDEF = pd.merge(testDataDEF, prevWeeksAvgDEF, on = 'playerID', how='left')
-testDataGK = pd.merge(testDataGK, prevWeeksAvgGK, on = 'playerID', how='left')
+testDataATK = pd.merge(testDataATK, prevWeeksAvgATK, left_on = 'id', right_on = 'playerID', how='left')
+testDataMID = pd.merge(testDataMID, prevWeeksAvgMID, left_on = 'id', right_on = 'playerID', how='left')
+testDataDEF = pd.merge(testDataDEF, prevWeeksAvgDEF, left_on = 'id', right_on = 'playerID', how='left')
+testDataGK = pd.merge(testDataGK, prevWeeksAvgGK, left_on = 'id', right_on = 'playerID', how='left')
+
+#testDataMID.to_csv('TESTMID.csv')
+
+testDataMID = testDataMID.dropna()
+testDataDEF = testDataMID.dropna()
+testDataGK = testDataMID.dropna()
 
 #Store player ID to insert again after predictions
-testPlayerIdATK = testDataATK['playerID']
-testPlayerIdMID = testDataMID['playerID']
-testPlayerIdDEF = testDataDEF['playerID']
-testPlayerIdGK = testDataGK['playerID']
+testPlayerIdATK = testDataATK['id']
+testPlayerIdMID = testDataMID['id']
+testPlayerIdDEF = testDataDEF['id']
+testPlayerIdGK = testDataGK['id']
 
 #drop player IDs for all dataframes
 trainDataATK = trainDataATK.drop('playerID',axis=1)
-testDataATK = testDataATK.drop('playerID',axis=1)
+testDataATK = testDataATK.drop('id',axis=1)
 
 trainDataMID = trainDataMID.drop('playerID',axis=1)
-testDataMID = testDataMID.drop('playerID',axis=1)
+testDataMID = testDataMID.drop('id',axis=1)
 
 trainDataDEF = trainDataDEF.drop('playerID',axis=1)
-testDataDEF = testDataDEF.drop('playerID',axis=1)
+testDataDEF = testDataDEF.drop('id',axis=1)
 
 trainDataGK = trainDataGK.drop('playerID',axis=1)
-testDataGK = testDataGK.drop('playerID',axis=1)
-
-
-
-
+testDataGK = testDataGK.drop('id',axis=1)
 
 
 
@@ -472,16 +478,16 @@ yTestGK = testDataGK['total_points']
 
 
 trainDataATK = trainDataATK.drop(['total_points','in_dreamteam'],axis=1)
-testDataATK = testDataATK.drop(['total_points','in_dreamteam'],axis=1)
+testDataATK = testDataATK.drop(['total_points'],axis=1)
 
 trainDataMID = trainDataMID.drop(['total_points','in_dreamteam'],axis=1)
-testDataMID = testDataMID.drop(['total_points','in_dreamteam'],axis=1)
+testDataMID = testDataMID.drop(['total_points'],axis=1)
 
 trainDataDEF = trainDataDEF.drop(['total_points','in_dreamteam'],axis=1)
-testDataDEF = testDataDEF.drop(['total_points','in_dreamteam'],axis=1)
+testDataDEF = testDataDEF.drop(['total_points'],axis=1)
 
 trainDataGK = trainDataGK.drop(['total_points','in_dreamteam'],axis=1)
-testDataGK = testDataGK.drop(['total_points','in_dreamteam'],axis=1)
+testDataGK = testDataGK.drop(['total_points'],axis=1)
 
 
 #align column order
@@ -503,9 +509,24 @@ dfset = [trainDataATK, testDataATK, trainDataMID, testDataMID, trainDataDEF, tes
 
 #Scale variables
 for df in dfset:
-	print("TEST",df.shape)
 	for col in df.columns:
 		df[col] = minMaxScaler.fit_transform(df[col].values.reshape(-1,1))
+
+
+
+#Check nulls in both dataframes
+displayNullStats(0, trainDataATK)
+displayNullStats(0, testDataATK)
+displayNullStats(0, trainDataMID)
+displayNullStats(0, testDataMID)
+displayNullStats(0, trainDataDEF)
+displayNullStats(0, testDataDEF)
+displayNullStats(0, trainDataGK)
+displayNullStats(0, testDataGK)
+
+
+
+
 
 
 #MODELING##################################################################
@@ -519,10 +540,10 @@ modelList = [LinearRegression(),
 
 
 #test each model across the different datasets, print r2 score
-testRegressor(trainDataATK, yTrainATK, testDataATK, yTestATK, testPlayerIdATK, modelList, 'ATK')
-testRegressor(trainDataMID, yTrainMID, testDataMID, yTestMID, testPlayerIdMID, modelList, 'MID')
-testRegressor(trainDataDEF, yTrainDEF, testDataDEF, yTestDEF, testPlayerIdDEF, modelList, 'DEF')
-testRegressor(trainDataGK, yTrainGK, testDataGK, yTestGK, testPlayerIdGK, modelList, 'GK')
+#testRegressor(trainDataATK, yTrainATK, testDataATK, yTestATK, testPlayerIdATK, modelList, 'ATK')
+#testRegressor(trainDataMID, yTrainMID, testDataMID, yTestMID, testPlayerIdMID, modelList, 'MID')
+#testRegressor(trainDataDEF, yTrainDEF, testDataDEF, yTestDEF, testPlayerIdDEF, modelList, 'DEF')
+#testRegressor(trainDataGK, yTrainGK, testDataGK, yTestGK, testPlayerIdGK, modelList, 'GK')
 
 #create list of datasets to loop through
 xTrL = [trainDataATK, trainDataMID, trainDataDEF, trainDataGK]
@@ -537,7 +558,7 @@ nameList = ['ATK', 'MID', 'DEF', 'GK']
 playerIDs = [testPlayerIdATK, testPlayerIdMID, testPlayerIdDEF, testPlayerIdGK]
 
 #find best alpha value
-tuneHyperparameters(xTrL, yTrL, nameList, Ridge())
+#tuneHyperparameters(xTrL, yTrL, nameList, Ridge())
 
 #Make Predictions for next week, output to CSV
 atkPred, midPred, defPred, gkPred = makePredictions(xTrL, yTrL, xTeL, yTeL, playerIDs, Ridge(alpha = 0.1), nameList)

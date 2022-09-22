@@ -12,11 +12,14 @@ def fixtureScraper(toRun):
 	if toRun == 0:
 		pass
 	else:
+		print("Scraping fixture data")
+
 		link = "https://fantasy.premierleague.com/api/fixtures/"
 		response = requests.get(link)
 		data = response.json()
-		with open("fixtures.json", "w", encoding="utf-8") as f:
+		with open("C:/Users/bradl/OneDrive/Desktop/Professional/FPL/IntFiles/fixtures.json", "w", encoding="utf-8") as f:
 		    json.dump(data, f, ensure_ascii = False, indent = 4)
+		f.close()
 
 
 #Parsing function
@@ -24,6 +27,7 @@ def fixtureParser(toRun):
 	if toRun == 0:
 		pass
 	else:
+		print("Parsing fixture data")
 
 		#Reading and parsing JSON
 		f = open('C:/Users/bradl/OneDrive/Desktop/Professional/FPL/IntFiles/fixtures.json', encoding="utf-8")
@@ -35,9 +39,11 @@ def fixtureParser(toRun):
 		#Send fixture data to CSV
 		dfFixtures.to_csv('C:/Users/bradl/OneDrive/Desktop/Professional/FPL/ParsedFiles/fixtures.csv',index=False)
 
+		f.close()
+
 
 
 #DRIVER CODE##############
 
-fixtureScraper(0)
+fixtureScraper(1)
 fixtureParser(1)
