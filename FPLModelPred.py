@@ -31,6 +31,15 @@ gameweekData = pd.read_csv('C:/Users/bradl/OneDrive/Desktop/Professional/FPL/Par
 currTeam = [478, 285, 463, 306, 465, 407, 19, 283, 261, 28, 40, 43, 439, 166]
 
 
+#Current gameweek variable (one to be predicted)
+currGameweek = 9
+
+positionMap = {'GK'  : 1,
+			   'DEF' : 2,
+			   'MID' : 3,
+			   'FWD' : 4,
+}
+
 
 def displayNullStats(display, dataframe):
     if display == 0:
@@ -55,9 +64,6 @@ def aggregatePrevGameweeks(startweek: int, endweek: int, dataframe, features):
 
 	#dataframe to hold aggregate gameweek data
 	aggRes = pd.DataFrame()
-
-	#output
-	print("Aggregating data for gameweeks {} to {}".format(startweek, endweek))
 
 	#get gameweek data between desired parameters, store in aggRes
 	dataframe = dataframe[(dataframe['gameweek'] >= startweek) & (dataframe['gameweek'] <= endweek)]
@@ -211,17 +217,6 @@ def suggestTransfer(transferDF, currTeam):
 
 #Global maps, variables
 
-#Current gameweek variable (one to be predicted)
-currGameweek = 9
-
-
-
-positionMap = {'GK'  : 1,
-			   'DEF' : 2,
-			   'MID' : 3,
-			   'FWD' : 4,
-}
-
 
 #TEAM DATA PREPROCESSING###########################################
 
@@ -259,7 +254,7 @@ fixtureData['difficultyDifferential'] = fixtureData['strength_overall_home'] - f
 playerDataColsToDrop = [ 'code','cost_change_event','cost_change_event_fall','cost_change_start','cost_change_start_fall','news','news_added','photo','special',
 						'squad_number','team_code','transfers_in', 'transfers_in_event','transfers_out', 'transfers_out_event','value_form','value_season','web_name',
 						'corners_and_indirect_freekicks_order','corners_and_indirect_freekicks_text', 'direct_freekicks_order','direct_freekicks_text', 'penalties_order', 
-						'penalties_text']
+						'penalties_text','in_dreamteam']
 
 #drop columns
 playerData = playerData.drop(playerDataColsToDrop, axis = 1)
@@ -271,25 +266,15 @@ playerData['teamName'] = playerData['team'].map(teamMap)
 
 #GAMEWEEK PREPROCESSING##############################################################################################################
 
-
-
-
-#last 4 weeks of data for training:
-
-#split trainig and testing sets
+#Get training dataset outside of the current gameweek (one to be predicted)
 trainData = gameweekData[gameweekData['gameweek'] != currGameweek]
-testData = gameweekData[gameweekData == (currGameweek-1)]
 
-
-#Add chance_of_playing_next_round?? form instead of average it??
+#join in player data for both datasets
+trainData = pd.merge(trainData, playerData[['id','element_type','form','team','status']], left_on = 'playerID', right_on = 'id', how ='left').drop('id',axis=1)
 testData = playerData[['id','team','status','element_type']]
 
 #needed to merge fixture data
 testData['event'] = currGameweek
-
-
-#join in player data for train data
-trainData = pd.merge(trainData, playerData[['id','element_type','form','team','status']], left_on = 'playerID', right_on = 'id', how ='left').drop('id',axis=1)
 
 
 #Filter for active players (not injured, suspended, on loan, etc.)
@@ -300,7 +285,6 @@ testData = testData[testData['status'] == 'a']
 trainData = trainData.drop('status',axis=1)
 testData = testData.drop('status',axis=1)
 
-
 #join for home team...check if team matches with team_h otherwise we know they'rw away
 #1st step - join for the home team in a gameweek
 trainData = pd.merge(trainData, fixtureData[['event','team_h']], left_on = ['gameweek','team'], right_on = ['event','team_h'], how='left').drop('event',axis=1)
@@ -309,8 +293,6 @@ testData = pd.merge(testData, fixtureData[['event','team_h']], left_on = ['event
 #Then join back to get away team
 trainData = pd.merge(trainData, fixtureData[['event','team_a']], left_on = ['gameweek','team'], right_on = ['event','team_a'], how='left').drop('event',axis=1)
 testData = pd.merge(testData, fixtureData[['event','team_a']], left_on = ['event','team'], right_on = ['event','team_a'], how='left')
-
-
 
 #JOIN FOR OPPONENT TEAM
 #opponent is home team, drop the away column as it is just the joining column. merge the team_h_x
@@ -321,8 +303,7 @@ trainData['team_h'] = trainData['team_h'].fillna(trainData['team_h_y'])
 trainData = trainData.drop(['event', 'team_h_y', 'team_a_y'],axis=1)
 
 
-
-#same process for testing data
+#same process as above for testing dataset
 testData = pd.merge(testData, fixtureData[['event','team_h','team_a']], left_on = ['event','team'], right_on = ['event','team_a'], how='left', suffixes = ("","_y"))
 
 #fill null home team values with merged home team, drop columns
@@ -368,8 +349,8 @@ trainData = trainData[trainData['gameweek'] != 8]
 
 
 #Check nulls in both dataframes
-displayNullStats(0, trainData)
-displayNullStats(0, testData)
+displayNullStats(1, trainData)
+displayNullStats(1, testData)
 
 
 #Split into ATK, MID, DEF, GK groups
@@ -477,16 +458,16 @@ yTrainGK = trainDataGK['total_points']
 yTestGK = testDataGK['total_points']
 
 
-trainDataATK = trainDataATK.drop(['total_points','in_dreamteam'],axis=1)
+trainDataATK = trainDataATK.drop(['total_points'],axis=1)
 testDataATK = testDataATK.drop(['total_points'],axis=1)
 
-trainDataMID = trainDataMID.drop(['total_points','in_dreamteam'],axis=1)
+trainDataMID = trainDataMID.drop(['total_points'],axis=1)
 testDataMID = testDataMID.drop(['total_points'],axis=1)
 
-trainDataDEF = trainDataDEF.drop(['total_points','in_dreamteam'],axis=1)
+trainDataDEF = trainDataDEF.drop(['total_points'],axis=1)
 testDataDEF = testDataDEF.drop(['total_points'],axis=1)
 
-trainDataGK = trainDataGK.drop(['total_points','in_dreamteam'],axis=1)
+trainDataGK = trainDataGK.drop(['total_points'],axis=1)
 testDataGK = testDataGK.drop(['total_points'],axis=1)
 
 
@@ -495,6 +476,7 @@ trainDataATK = trainDataATK[testDataATK.columns]
 trainDataMID = trainDataMID[testDataMID.columns]
 trainDataDEF = trainDataDEF[testDataDEF.columns]
 trainDataGK = trainDataGK[testDataGK.columns]
+
 
 #for col in trainDataATK:
 #	sns.histplot(data=trainDataATK, x=col, kde=True, palette='dark').set(title='Histogram of {}'.format(str(col)))
@@ -563,8 +545,9 @@ playerIDs = [testPlayerIdATK, testPlayerIdMID, testPlayerIdDEF, testPlayerIdGK]
 #Make Predictions for next week, output to CSV
 atkPred, midPred, defPred, gkPred = makePredictions(xTrL, yTrL, xTeL, yTeL, playerIDs, Ridge(alpha = 0.1), nameList)
 
-
+#we only want to make transfer on attackers or midfielders - more consistent and higher point creators
 atkMidJoined = pd.concat([atkPred, midPred])
 
+#find players with higher predicted points and lower cost, send to CSV for analysis
 suggestTransfer(atkMidJoined, currTeam)
 
